@@ -10,14 +10,14 @@ case class Function(
     name: Label,
     params: Container[Param],
     body: Container[Expr],
-    `type`: Type
+    ty: Type
 ) extends Expr
 
 case class ConstInt(i: Int) extends Expr
 
 case class ConstBool(b: Boolean) extends Expr
 
-case class Var(name: Label, `type`: Type) extends Expr
+case class Var(name: Label, ty: Type) extends Expr
 
 enum BinOpType {
   case Add
@@ -32,4 +32,4 @@ enum BinOpType {
   case CmpEq
 }
 
-case class BinaryOp(lhs: Expr, rhs: Expr, `type`: BinOpType) extends Expr
+case class BinaryOp(lhs: Expr, rhs: Expr, ty: BinOpType) extends Expr

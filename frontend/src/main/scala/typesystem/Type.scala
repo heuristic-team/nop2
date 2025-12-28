@@ -5,5 +5,5 @@ package frontend.typesystem
 enum `Type` {
   case Int
   case Boolean
-  case Fn(from: Type, to: Type)
+  case Fn(from: List[Type], to: Type)
 }

@@ -4,6 +4,7 @@ import frontend.typesystem.Type
 
 sealed trait Expr {
   def getType: Type
+  def isPrimitive: Boolean = false
 }
 
 case class Call(function: Expr, args: Container[Expr]) extends Expr {
@@ -14,7 +15,7 @@ case class Call(function: Expr, args: Container[Expr]) extends Expr {
     case t => throw RuntimeException("expected: Type.Fn, got: " + t)
   }
 
-  def isPrimitive: Boolean = {
+  override def isPrimitive: Boolean = {
     val name = function match {
       case Var(name, ty) => name
       case _             => false

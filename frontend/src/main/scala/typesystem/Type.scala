@@ -7,4 +7,9 @@ enum `Type` {
   case Boolean
   case Fn(from: List[Type], to: Type)
   case Placeholder
+
+  def arity: Option[Int] = this match {
+    case Fn(from, to) => Some(from.length)
+    case _            => None
+  }
 }

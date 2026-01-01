@@ -6,10 +6,6 @@ import frontend.ast._
 import scala.collection.mutable.HashMap
 import frontend.typesystem.Type
 
-trait Parser[T] {
-  def parse(input: T): Expr
-}
-
 val defaultVar: String => Var = Var(_, Type.Placeholder)
 
 def identifier[$: P]: P[String] = P(CharIn("_\\a-z\\A-Z").rep(1).!)
@@ -24,8 +20,10 @@ def variable[$: P]: P[Var] =
 def primaryExpression[$: P] =
   const | variable
 
+def seqToContainer[T]: Seq[T] => Container[T] = _.toList
+
 def args[$: P]: P[List[Expr]] =
-  P(expr.rep(sep = ",")).map(_.toList)
+  P(expr.rep(sep = ",")).map(seqToContainer)
 
 def callExpr[$: P]: P[Expr] =
   (primaryExpression ~ ("(" ~ args.? ~ ")").rep).map { (expr, calls) =>
@@ -35,7 +33,7 @@ def callExpr[$: P]: P[Expr] =
 def divMul[$: P] = {
   P(callExpr ~ (CharIn("/*").! ~/ callExpr).rep).map { case (e, list) =>
     list.foldLeft(e) { case (lhs, (fname, rhs)) =>
-      Call(defaultVar(fname), List(lhs, rhs))
+      Call(defaultVar(fname), Container(lhs, rhs))
     }
   }
 }
@@ -43,7 +41,7 @@ def divMul[$: P] = {
 def addSub[$: P] = {
   P(divMul ~ (CharIn("+\\-").! ~/ divMul).rep).map { case (e, list) =>
     list.foldLeft(e) { case (lhs, (fname, rhs)) =>
-      Call(defaultVar(fname), List(lhs, rhs))
+      Call(defaultVar(fname), Container(lhs, rhs))
     }
   }
 }

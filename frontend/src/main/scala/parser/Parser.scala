@@ -63,3 +63,6 @@ def block[$: P]: P[Expr] =
 
 def expr[$: P] =
   block | define | addSub
+
+def program(fileName: String)[$: P] =
+  expr.rep.map(s => TranslationUnit(DefaultTUCtx(fileName), s.toList))

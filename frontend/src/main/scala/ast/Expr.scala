@@ -4,7 +4,7 @@ import frontend.typesystem.Type
 
 sealed trait Expr
 
-case class Call(functionName: Label, args: Container[Expr]) extends Expr
+case class Call(function: Expr, args: Container[Expr]) extends Expr
 
 case class Function(
     name: Label,
@@ -18,18 +18,3 @@ case class ConstInt(i: Int) extends Expr
 case class ConstBool(b: Boolean) extends Expr
 
 case class Var(name: Label, ty: Type) extends Expr
-
-enum BinOpType {
-  case Add
-  case Sub
-  case Mul
-  case Div
-  case CmpLe
-  case CmpLt
-  case CmpGt
-  case CmpGe
-  case CmpNe
-  case CmpEq
-}
-
-case class BinaryOp(lhs: Expr, rhs: Expr, ty: BinOpType) extends Expr

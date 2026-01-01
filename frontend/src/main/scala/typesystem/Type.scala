@@ -6,4 +6,5 @@ enum `Type` {
   case Int
   case Boolean
   case Fn(from: List[Type], to: Type)
+  case Placeholder
 }

@@ -7,6 +7,14 @@ sealed trait Expr {
   def isPrimitive: Boolean = false
 }
 
+case class Block(body: Container[Expr]) extends Expr {
+  def getType: Type = body.last.getType
+}
+
+case class Define(name: Label, ty: Type, body: Expr) extends Expr {
+  def getType: Type = ty
+}
+
 case class Call(function: Expr, args: Container[Expr]) extends Expr {
   def getType: Type = function.getType match {
     case Type.Fn(from, to) => to

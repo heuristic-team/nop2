@@ -8,10 +8,10 @@ import frontend.typesystem.Type
 
 val defaultVar: String => Var = Var(_, Type.Placeholder)
 
-def identifier[$: P]: P[String] = P(CharIn("_\\a-z\\A-Z").rep(1).!)
+def identifier[$: P]: P[String] = P(CharIn("_\\a-z\\A-Z").repX(1).!)
 
 // TODO: 0x..., 0b..., floats, negative numbers. also booleans
-def number[$: P]: P[Int] = P(CharIn("0-9").rep(1).!.map(_.toInt))
+def number[$: P]: P[Int] = P(CharIn("0-9").repX(1).!.map(_.toInt))
 def const[$: P] = number.map(ConstInt(_))
 
 def variable[$: P]: P[Var] =
@@ -46,5 +46,20 @@ def addSub[$: P] = {
   }
 }
 
+def types[$: P] =
+  identifier.map { str =>
+    str match {
+      case "Int"  => Type.Int
+      case "Bool" => Type.Boolean
+      case s      => Type.Custom(s)
+    }
+  }
+
+def define[$: P]: P[Expr] =
+  P(types ~ identifier ~ "=" ~ expr).map((t, id, e) => Define(id, t, e))
+
+def block[$: P]: P[Expr] =
+  ("{" ~ expr.rep ~ "}").map(s => Block(s.toList))
+
 def expr[$: P] =
-  addSub
+  block | define | addSub

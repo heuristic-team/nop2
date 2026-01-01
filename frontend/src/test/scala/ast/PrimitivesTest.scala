@@ -10,7 +10,6 @@ import fastparse._
 
 import frontend.parser._
 import frontend.typesystem.Type
-// println(parse("hello(1 + 2)(hi)", expr(using _)))
 
 class ParserSpec extends AnyFlatSpec with should.Matchers {
   def `var`: String => Var = Var(_, Type.Placeholder)

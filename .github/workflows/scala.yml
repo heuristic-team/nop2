@@ -26,4 +26,4 @@ jobs:
     - name: Setup sbt launcher
       uses: sbt/setup-sbt@v1
     - name: Run frontend tests
-      run: (cd frontend/ && sbt test)
+      run: sbt test

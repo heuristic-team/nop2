@@ -5,7 +5,7 @@ import scala.collection.immutable.HashMap
 import frontend.typesystem.Type
 
 object Primitives {
-  extension (list: List[Type]) {
+  extension (list: Container[Type]) {
     infix def ->(to: Type): Type =
       Type.Fn(list, to)
   }

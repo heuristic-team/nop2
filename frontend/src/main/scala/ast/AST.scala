@@ -1,7 +1,7 @@
 package frontend.ast
 
 type Label = String
-type Param = (Label, Expr)
+type Param = (Label, Var)
 type Container[T] = List[T]
 
 def Container[T](ts: T*): Container[T] = List(ts*)

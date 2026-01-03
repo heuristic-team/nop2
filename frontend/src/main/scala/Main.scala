@@ -5,10 +5,12 @@ import fastparse._
 import frontend.typesystem.DummyIntPass
 import fastparse.Parsed.Failure
 import fastparse.Parsed.Success
+import frontend.typesystem.RemovePlaceholders
 
 val test = """Int hello = {
-    Bool hi = true
-    Boris hi_ = 13 + hello
+    Bool hi = 13
+    Int hi_ = 13 + hello
+    hi
     hi_
 }
 
@@ -26,6 +28,6 @@ Int hi = 13
       throw RuntimeException("Parsing failed. Compiler exits.")
     case Success(value, index) => value
   }
-  val translation_unit = DummyIntPass(t)
+  val translation_unit = RemovePlaceholders(t)
   println(translation_unit)
 }

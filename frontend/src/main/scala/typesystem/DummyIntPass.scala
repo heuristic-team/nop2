@@ -1,5 +1,7 @@
 package frontend.typesystem
 
+import core.typesystem.Type
+
 import frontend.ast._
 
 object DummyIntPass extends ASTPass {

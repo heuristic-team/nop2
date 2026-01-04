@@ -14,7 +14,7 @@ val test = """Int hello = {
     hi_
 }
 
-Int hi = 1u
+Int hi = 1
 
 148
 """

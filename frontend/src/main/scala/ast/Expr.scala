@@ -1,6 +1,6 @@
 package frontend.ast
 
-import frontend.typesystem.Type
+import core.typesystem.Type
 
 sealed trait Expr {
   def getType: Type

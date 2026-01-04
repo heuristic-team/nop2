@@ -2,7 +2,7 @@ package frontend.ast
 
 import scala.collection.immutable.HashMap
 
-import frontend.typesystem.Type
+import core.typesystem.Type
 
 object Primitives {
   extension (list: Container[Type]) {

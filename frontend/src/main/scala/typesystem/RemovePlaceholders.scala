@@ -1,5 +1,7 @@
 package frontend.typesystem
 
+import core.typesystem.Type
+
 import frontend.ast._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Stack

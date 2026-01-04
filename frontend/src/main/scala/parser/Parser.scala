@@ -2,9 +2,10 @@ package frontend.parser
 
 import fastparse._, ScalaWhitespace._
 
+import core.typesystem.Type
+
 import frontend.ast._
 import scala.collection.mutable.HashMap
-import frontend.typesystem.Type
 
 val defaultVar: String => Var = Var(_, Type.Placeholder)
 

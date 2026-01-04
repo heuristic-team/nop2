@@ -1,6 +1,4 @@
-package frontend.typesystem
-
-// TODO: make it a part of semantic checks package and use it in backend too.
+package core.typesystem
 
 enum `Type` {
   case Int

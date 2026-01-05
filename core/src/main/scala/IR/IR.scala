@@ -12,7 +12,8 @@ sealed trait IRImm extends IR
 type Container[T] = Vector[T]
 
 // Labels:
-case class Fn(name: String, params: Var, blocks: Container[Block]) extends Label
+case class Fn(name: String, params: Container[Var], blocks: Container[Block])
+    extends Label
 
 case class Block(name: String, stmts: Container[IRInstr]) extends Label
 

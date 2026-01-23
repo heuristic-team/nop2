@@ -32,7 +32,6 @@ pub fn rbtree(comptime T: type) type {
 			allocator: @import("std").mem.Allocator,
 			toStringFn: fn(T, @import("std").mem.Allocator) anyerror![]const u8
 		) !void {
-			// Правое поддерево
             if (self.right) |right| {
 				const new_prefix = if (is_left)
 					try @import("std").fmt.allocPrint(allocator, "{s}│   ", .{prefix})
@@ -148,7 +147,6 @@ pub fn rbtree(comptime T: type) type {
 			}
 
 			if (cur.right) |right| {
-				@import("std").debug.print("call rec\n", .{});
 				if (right.lower_bound(value_comparator, value))
 				|lb_from_right| {
 					if (value_comparator(lb_from_right, cur.value)) {
@@ -156,7 +154,6 @@ pub fn rbtree(comptime T: type) type {
 					}
 				}
 			}
-			@import("std").debug.print("last ret\n", .{});
 			return cur.value;
 		}
 

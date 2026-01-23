@@ -1,13 +1,13 @@
 const Config = @import("config.zig");
 const Arena = @import("arena.zig");
 const RBTree = @import("rbtree.zig").rbtree(Arena);
+const Array = @import("dynamic_array.zig");
 
 const c = @cImport({
 	@cInclude("stdlib.h");
 });
 
 const Self = @This();
-const AllocatorError = error{InvalidConfig, OOMInInit};
 const IndexOfArena = u32;
 
 arena_size: usize,
@@ -15,17 +15,19 @@ capacity_of_heap: usize,
 arenas: []Arena,
 treeped_arenas: RBTree,
 
-archive_of_arenas: []IndexOfArena,
-active_arenas: []IndexOfArena,
-current_arena: IndexOfArena,
+archive_of_arenas: Array.dynamic_array(IndexOfArena),
+active_arenas: Array.dynamic_array(IndexOfArena),
+current_arenas: Array.dynamic_array(IndexOfArena),
 
-pub fn alloc(self: *Self, size: usize) ?[*]u8 {
+// pub fn alloc(self: *Self, size: usize) ?[*]u8 {
+//
+// }
 
-}
+pub const AllocatorError = error{InvalidConfig, OOMInInit, EmptyArchive, OOM};
 
-fn calloc(count: usize, T: type) ?[]T {
+pub fn calloc(count: usize, T: type) ?[]T {
 	const raw: [*]T = @ptrCast(@alignCast(c.malloc(@sizeOf(T) * count) orelse return null));
-	return raw[0..0];
+	return raw[0..count];
 }
 
 pub fn init(cfg: Config) AllocatorError!*Self {
@@ -44,12 +46,25 @@ pub fn init(cfg: Config) AllocatorError!*Self {
 	this.arenas = calloc(count_of_arenas, Arena)
 		orelse return AllocatorError.OOMInInit;
 
-	this.archive_of_arenas = calloc(count_of_arenas, IndexOfArena)
+	this.archive_of_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
 		orelse return AllocatorError.OOMInInit;
 
-	this.active_arenas = calloc(count_of_arenas, IndexOfArena)
+	this.active_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
 		orelse return AllocatorError.OOMInInit;
 
+	this.current_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
+		orelse return AllocatorError.OOMInInit;
 
+	for (0..count_of_arenas) |i| {
+		this.archive_of_arenas.pop(count_of_arenas - i - 1);
+	}
+}
 
+fn unarchive(self: *Self) AllocatorError!void {
+	const new_arena = self.archive_of_arenas.pop()
+		orelse return AllocatorError.EmptyArchive;
+	self.active_arenas.push(new_arena);
+	self.current_arenas.push(new_arena);
+
+	self.arenas[new_arena].
 }

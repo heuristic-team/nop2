@@ -9,7 +9,7 @@ sealed trait IRTerm extends IR
 sealed trait IRImm extends IR
 
 // Once i write ilist it's gonna be ilist i think
-type Container[T] = Vector[T]
+type Container[T] = List[T]
 
 // Labels:
 case class Fn(name: String, params: Container[Var], blocks: Container[Block])

@@ -63,6 +63,7 @@ pub fn init(cfg: Config) AllocatorError!*Self {
 fn unarchive(self: *Self) AllocatorError!void {
 	const new_arena = self.archive_of_arenas.pop()
 		orelse return AllocatorError.EmptyArchive;
+
 	self.active_arenas.push(new_arena);
 	self.current_arenas.push(new_arena);
 

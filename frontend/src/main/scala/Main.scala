@@ -9,7 +9,7 @@ import frontend.typesystem.RemovePlaceholders
 
 val test = """Int hello = {
     Bool hi = 13
-    Int hi_ = 13 + hello
+    Int hi_ = 13 + hello + read()
     hi
     hi_
 }

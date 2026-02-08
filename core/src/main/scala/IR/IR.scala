@@ -8,18 +8,19 @@ sealed trait IRInstr extends IR
 sealed trait IRTerm extends IR
 sealed trait IRImm extends IR
 
-// Once i write ilist it's gonna be ilist i think
 type Container[T] = List[T]
 
 // Labels:
 case class Fn(name: String, params: Container[Var], blocks: Container[Block])
     extends Label
 
+case class Call(function: Fn, args: Container[Var]) extends IRInstr
+
 case class Block(name: String, stmts: Container[IRInstr]) extends Label
 
 // Instructions:
 
-case class Const(value: IRImm) extends IRInstr
+case class Const(res: Var, value: IRImm) extends IRInstr
 
 // Binary instructions:
 
@@ -37,11 +38,15 @@ case class BinaryInstruction(
     op: BinaryOp
 ) extends IRInstr
 
+case class Mov(lhs: Var, rhs: Var) extends IRInstr
+
 // Arguments:
 
 case class Var(name: String, t: Type) extends IR
 
 case class ConstInt(value: Int) extends IRImm
+
+case class ConstBool(value: Boolean) extends IRImm
 
 // Terminators:
 

@@ -2,25 +2,60 @@ package core.ir
 
 import core.typesystem.Type
 
-sealed trait IR
-sealed trait Label extends IR
-sealed trait IRInstr extends IR
-sealed trait IRTerm extends IR
-sealed trait IRImm extends IR
+import scala.compiletime.uninitialized
 
-type Container[T] = List[T]
+trait WithOwner[T] {
+  def owner: T
+}
+
+sealed trait IR
+
+sealed trait Label extends IR
+
+sealed trait IRInstr(block: Block) extends IR with WithOwner[Block] {
+  def owner: Block = block
+}
+
+sealed trait Terminal
+
+sealed trait IRImm extends IR with WithOwner[IRInstr] {
+  var _owner: IRInstr = uninitialized
+  def owner_=(instr: IRInstr): Unit =
+    _owner = instr
+  def owner: IRInstr = _owner
+}
+
+class CompilationUnit(ctx: CompilationContext) extends IR with IRContainer[Fn]
 
 // Labels:
-case class Fn(name: String, params: Container[Var], blocks: Container[Block])
+case class Fn(
+    name: String,
+    params: Container[Var] = Container()
+)(using cu: CompilationUnit)
     extends Label
+    with IRContainer[Block]
+    with WithOwner[CompilationUnit] {
 
-case class Call(function: Fn, args: Container[Var]) extends IRInstr
+  def basicBlocks: Container[Block] = elems
 
-case class Block(name: String, stmts: Container[IRInstr]) extends Label
+  def owner: CompilationUnit = cu
+}
+
+case class Call(res: Var, function: Fn)(using
+    block: Block
+) extends IRInstr(block)
+    with IRContainer[Var]
+
+case class Block(
+    name: String
+)(using fn: Fn)
+    extends Label
+    with IRContainer[IRInstr]
 
 // Instructions:
 
-case class Const(res: Var, value: IRImm) extends IRInstr
+case class Const(res: Var, value: IRImm)(using block: Block)
+    extends IRInstr(block)
 
 // Binary instructions:
 
@@ -31,14 +66,13 @@ enum BinaryOp {
   case Mul
 }
 
-case class BinaryInstruction(
-    res: Var,
-    lhs: Var,
-    rhs: Var,
-    op: BinaryOp
-) extends IRInstr
+case class BinaryInstruction(res: Var, lhs: Var, rhs: Var, op: BinaryOp)(using
+    block: Block
+) extends IRInstr(block)
 
-case class Mov(lhs: Var, rhs: Var) extends IRInstr
+case class Mov(lhs: Var, rhs: Var)(using block: Block) extends IRInstr(block)
+
+case class Read(res: Var)(using block: Block) extends IRInstr(block)
 
 // Arguments:
 
@@ -50,4 +84,6 @@ case class ConstBool(value: Boolean) extends IRImm
 
 // Terminators:
 
-case class Ret(value: Option[Var]) extends IRTerm
+case class Ret(value: Option[Var])(using block: Block)
+    extends IRInstr(block)
+    with Terminal

@@ -1,4 +1,6 @@
-package core.asm
+package core.asm.asm
+
+// TODO: make it cross-platform
 
 trait Asm
 
@@ -14,6 +16,9 @@ case class Global(label: Label) extends Pragma
 given s2l: Conversion[String, Label] = Label(_)
 
 case class Label(label: String) extends Asm
+
+// TODO: make full-fledged memory operands
+type Memory = Label
 
 trait Immediate extends Asm
 

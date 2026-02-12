@@ -1,6 +1,5 @@
 package core.asm.register
 
-// TODO: make it cross-platform
 sealed trait Register
 
 case class RAX() extends Register

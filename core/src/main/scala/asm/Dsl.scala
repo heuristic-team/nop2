@@ -1,7 +1,7 @@
 package core.asm.dsl
 
 import scala.quoted.*
-import core.asm._
+import core.asm.asm._
 
 inline def func(name: Label)(inline instrs: Instr): Func =
   Func(name, funcStage(instrs))

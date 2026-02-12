@@ -11,7 +11,6 @@ import core.typesystem.Type
 
 import scala.compiletime.uninitialized
 import scala.collection.mutable.HashMap
-import frontend.lowering.IRFactory.`var`
 
 val loggingEnabled = true
 
@@ -36,15 +35,12 @@ trait Translator[T] {
   def translate(t: T): IR
 }
 
+type MethodDefinition = (ast.Label, Type)
+
 case class AstTranslatorCtx(
     currentFn: Fn,
-    currentBlock: ir.Block,
-    varMap: HashMap[ast.Label, ir.Var]
-) {
-  def map(label: ast.Label): ir.Var = varMap(label)
-  def addMapping(label: ast.Label, variable: ir.Var): Unit =
-    varMap.addOne(label -> variable)
-}
+    currentBlock: ir.Block
+) {}
 
 class AstTranslator extends Translator[TranslationUnit] {
   given currentBlock(using ctx: AstTranslatorCtx): ir.Block = ctx.currentBlock
@@ -55,13 +51,10 @@ class AstTranslator extends Translator[TranslationUnit] {
 
   private def translate(cb: ast.ConstBool)(using
       ctx: AstTranslatorCtx
-  ) =
-    IRFactory.constBool(cb.b)
+  ) = IRFactory.constBool(cb.b)
 
   private def translate(v: ast.Var)(using ctx: AstTranslatorCtx) = {
-    val variable = IRFactory.`var`(v.name)
-    log(s"mapped variable ${v.name} to ${variable.name}")
-    variable
+    ir.Var(v.name, v.ty)
   }
 
   private def translatePrimitiveCall(call: ast.Call): ir.Var = { ??? }
@@ -71,6 +64,7 @@ class AstTranslator extends Translator[TranslationUnit] {
   )(using ctx: AstTranslatorCtx): ir.Var = {
     if !call.isPrimitive then
       throw IllegalArgumentException("only primitive calls are allowed for now")
+    call.args.map(translate(_))
 
     ???
   }

@@ -6,6 +6,7 @@ import frontend.typesystem.DummyIntPass
 import fastparse.Parsed.Failure
 import fastparse.Parsed.Success
 import frontend.typesystem.RemovePlaceholders
+import core.asm.dsltry.start
 
 val test = """Int hello = {
     Bool hi = 13
@@ -20,6 +21,8 @@ Int hi = 1
 """
 
 @main def hello(): Unit = {
+  println(start)
+  println()
   println(test)
   val tu = parse(test, program("test")(using _))
   val t = tu match {

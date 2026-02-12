@@ -55,15 +55,11 @@ object IRFactory {
   def constBool(b: Boolean)(using block: Block): Var =
     const(b, Type.Boolean, ConstBool(_))
 
-  def `var`(label: frontend.ast.Label)(using ctx: AstTranslatorCtx): Var =
-    ctx.map(label)
-
   def define(l: frontend.ast.Label, e: Var, t: Type)(using
       ctx: AstTranslatorCtx
   ): Var = {
-    val variable = newVar(t)
+    val variable = Var(l, t)
     val instr = blockAdd(producingInstr(variable, Mov(_, e)))
-    ctx.addMapping(l, variable)
     variable
   }
 }

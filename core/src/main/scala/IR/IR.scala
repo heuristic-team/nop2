@@ -40,7 +40,7 @@ case class Fn(
   def owner: CompilationUnit = cu
 }
 
-case class Call(result: Var, function: Fn)(using
+case class Call(result: Var, function: Var)(using
     block: Block
 ) extends IRInstr(block)
     with IRContainer[Var]

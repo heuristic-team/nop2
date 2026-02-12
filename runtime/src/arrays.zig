@@ -1,0 +1,68 @@
+
+const calloc = @import("utils.zig").calloc;
+
+pub fn runtime_static_array(comptime T: type) type {
+	return struct {
+		ptr: []T,
+		cur: usize,
+
+		const Self = @This();
+		pub fn pop(self: *Self) ?T {
+			if (self.cur == 0) return null;
+			const item = self.ptr[self.cur - 1];
+			self.cur -= 1;
+			return item;
+		}
+
+		pub fn push(self: *Self, value: T) void {
+			self.ptr[self.cur] = value;
+			self.cur += 1;
+		}
+
+		pub fn init(size: usize) ?Self {
+			return Self{
+				.cur = 0,
+				.ptr = calloc(size, T) orelse return null
+			};
+		}
+	};
+}
+
+pub fn runtime_static_array_with_delete(comptime T: type) type {
+	return struct {
+		ptr: []T,
+		cur: usize,
+		holes: runtime_static_array(u32),
+
+		const Self = @This();
+
+		pub fn push(self: *Self, value: T) void {
+			self.ptr[self.cur] = value;
+			self.cur += 1;
+		}
+
+		pub fn
+
+		pub fn init(size: usize) ?Self {
+			return Self{
+				.cur = 0,
+				.ptr = calloc(size, T) orelse return null,
+				.holes = runtime_static_array(u32).init(size)
+			};
+		}
+	};
+}
+
+test "push pop" {
+	const equ = @import("test.zig").equ;
+
+	var stack = runtime_static_array(usize).init(3).?;
+	stack.push(4);
+	stack.push(3);
+	stack.push(5);
+
+	try equ(stack.pop(), 5);
+	try equ(stack.pop(), 3);
+	try equ(stack.pop(), 4);
+}
+

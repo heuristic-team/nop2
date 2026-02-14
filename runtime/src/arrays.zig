@@ -28,31 +28,6 @@ pub fn runtime_static_array(comptime T: type) type {
 	};
 }
 
-pub fn runtime_static_array_with_delete(comptime T: type) type {
-	return struct {
-		ptr: []T,
-		cur: usize,
-		holes: runtime_static_array(u32),
-
-		const Self = @This();
-
-		pub fn push(self: *Self, value: T) void {
-			self.ptr[self.cur] = value;
-			self.cur += 1;
-		}
-
-		pub fn
-
-		pub fn init(size: usize) ?Self {
-			return Self{
-				.cur = 0,
-				.ptr = calloc(size, T) orelse return null,
-				.holes = runtime_static_array(u32).init(size)
-			};
-		}
-	};
-}
-
 test "push pop" {
 	const equ = @import("test.zig").equ;
 

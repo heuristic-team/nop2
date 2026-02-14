@@ -1,8 +1,8 @@
 const Config = @import("config.zig");
 const Arena = @import("arena.zig");
 const RBTree = @import("rbtree.zig").rbtree(Arena);
-const Array = @import("dynamic_array.zig");
-
+const Arrays = @import("arrays.zig");
+const Utils = @import("utils.zig");
 
 
 const Self = @This();
@@ -13,9 +13,9 @@ capacity_of_heap: usize,
 arenas: []Arena,
 treeped_arenas: RBTree,
 
-archive_of_arenas: Array.dynamic_array(IndexOfArena),
-active_arenas: Array.dynamic_array(IndexOfArena),
-current_arenas: Array.dynamic_array(IndexOfArena),
+archive_of_arenas: Arrays.runtime_static_array(IndexOfArena),
+active_arenas: Arrays.runtime_static_array(IndexOfArena),
+current_arenas: Arrays.runtime_static_array(IndexOfArena),
 
 // pub fn alloc(self: *Self, size: usize) ?[*]u8 {
 //
@@ -27,7 +27,7 @@ pub fn init(cfg: Config) AllocatorError!*Self {
 	if (cfg.log_arena_size > cfg.log_capacity_of_heap)
 		return AllocatorError.InvalidConfig;
 	if (cfg.log_arena_size < 8) return AllocatorError.InvalidConfig;
-	if (cfg.log_arena_size > 29) return AllocatorError.InvalidConfig;
+	if (cfg.log_arena_size > 16) return AllocatorError.InvalidConfig;
 	if ((1 << cfg.log_arena_size) < cfg.max_size_of_object_on_arena)
 		return AllocatorError.InvalidConfig;
 
@@ -36,16 +36,16 @@ pub fn init(cfg: Config) AllocatorError!*Self {
 	this.arena_size = 1 << cfg.log_arena_size;
 	this.capacity_of_heap = 1 << cfg.log_capacity_of_heap;
 
-	this.arenas = calloc(count_of_arenas, Arena)
+	this.arenas = Utils.calloc(count_of_arenas, Arena)
 		orelse return AllocatorError.OOMInInit;
 
-	this.archive_of_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
+	this.archive_of_arenas = Arrays.runtime_static_array(IndexOfArena).init(count_of_arenas)
 		orelse return AllocatorError.OOMInInit;
 
-	this.active_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
+	this.active_arenas = Arrays.runtime_static_array(IndexOfArena).init(count_of_arenas)
 		orelse return AllocatorError.OOMInInit;
 
-	this.current_arenas = Array.dynamic_array(IndexOfArena).init(count_of_arenas)
+	this.current_arenas = Arrays.runtime_static_array(IndexOfArena).init(count_of_arenas)
 		orelse return AllocatorError.OOMInInit;
 
 	for (0..count_of_arenas) |i| {
@@ -60,5 +60,5 @@ fn unarchive(self: *Self) AllocatorError!void {
 	self.active_arenas.push(new_arena);
 	self.current_arenas.push(new_arena);
 
-	self.arenas[new_arena].
+	// self.arenas[new_arena].
 }

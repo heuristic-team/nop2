@@ -5,15 +5,15 @@ const TypeSize = u16;
 offset: u16,
 
 pub fn from_ptrs(ptr: usize, addr_of_dead_span: usize) Self {
-	return Self{.offset = @intCast((addr_of_dead_span - ptr) >> 3)};
+	return Self{.offset = @intCast(addr_of_dead_span - ptr)};
 }
 
 pub fn start(self: Self, ptr: usize) usize {
-	return ptr + (self.offset << 3);
+	return ptr + self.offset;
 }
 
 fn ptr_of_size(self: Self, ptr: usize) *TypeSize {
-	return @as(*TypeSize, @ptrFromInt(ptr + (self.offset << 3)));
+	return @as(*TypeSize, @ptrFromInt(ptr + self.offset));
 }
 
 pub fn get_size(self: Self, ptr: usize) TypeSize {
@@ -25,5 +25,5 @@ pub fn set_size(self: Self, ptr: usize, size: TypeSize) void {
 }
 
 pub fn shift(self: *Self, size: TypeSize) void {
-	self.offset += (size >> 3);
+	self.offset += size;
 }

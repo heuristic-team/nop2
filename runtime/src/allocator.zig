@@ -13,9 +13,9 @@ capacity_of_heap: usize,
 arenas: []Arena,
 treeped_arenas: RBTree,
 
-archive_of_arenas: Arrays.runtime_static_array(IndexOfArena),
-active_arenas: Arrays.runtime_static_array(IndexOfArena),
-current_arenas: Arrays.runtime_static_array(IndexOfArena),
+// archive_of_arenas: Arrays.runtime_static_array(IndexOfArena),
+// active_arenas: Arrays.runtime_static_array(IndexOfArena),
+// current_arenas: Arrays.runtime_static_array(IndexOfArena),
 
 // pub fn alloc(self: *Self, size: usize) ?[*]u8 {
 //

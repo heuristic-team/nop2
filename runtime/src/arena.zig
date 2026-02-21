@@ -31,6 +31,7 @@ memory_used: usize = 0,
 count_of_categorys: Category = 15,
 
 
+pub const MAX_SUPPORT_PAGE_SIZE: usize = 1 << 16;
 const U8_1: u8 = 1;
 
 
@@ -108,16 +109,18 @@ fn size_by_8(self: *Self) Offset {
 }
 
 fn roundUpTo8(x: anytype) @TypeOf(x) {
-	return (x + 7) & ~@as(@TypeOf(x), 7);
+	return Utils.roundUpToN(x, 8);
 }
 
 fn roundUpTo64(x: anytype) @TypeOf(x) {
-  return (x + 63) & ~@as(@TypeOf(x), 63);
+  return Utils.roundUpToN(x, 64);
 }
+
 
 pub fn init(self: *Self, size: usize, large: bool, native: bool)
 Allocator.AllocatorError!void {
-	const bytes = Utils.calloc(size, u8)
+	if ((!large) and size > MAX_SUPPORT_PAGE_SIZE) return Allocator.AllocatorError.ArenaSizeIsLarge;
+  const bytes = Utils.calloc(size, u8)
 		orelse Allocator.AllocatorError.OOM;
 
 	defer @import("std").debug.print("start = {x}\n", .{self.start});
@@ -125,7 +128,7 @@ Allocator.AllocatorError!void {
 	self.size = size;
 	self.start = @intFromPtr((try bytes).ptr);
 	if (large) return;
-	self.count_of_categorys = self.category_of_object_by_size(self.size);
+	self.count_of_categorys = self.category_of_object_by_size(self.size) - 1;
 
 	defer _=self.rebuild();
 
@@ -208,7 +211,17 @@ fn get_dead_spans_list_array(self: *Self) []DeadSpan {
 	);
 }
 
+pub fn new(self: *Self, comptime T: type) !*T {
+  const raw = try self.alloc(@sizeOf(T));
+  const ptr: *T = @ptrCast(raw);
+  return ptr;
+}
+
 pub fn alloc(self: *Self, not_align_size: usize) ?usize {
+  return self.alloc_maybe_retry(not_align_size, false);
+
+}
+pub fn alloc_maybe_retry(self: *Self, not_align_size: usize, retry: bool) ?usize {
   @import("std").debug.print("allllllllllllllllllllllllllloca {d}\n", .{not_align_size});
 	const size: u16 = @intCast(roundUpTo8(not_align_size));
 	@import("std").debug.print("size: {d}\n", .{size});
@@ -224,7 +237,11 @@ pub fn alloc(self: *Self, not_align_size: usize) ?usize {
 	const category_of_object = self.category_of_object_by_size(size);
 	// @import("std").debug.print("cat: {d}\n", .{category_of_object});
 	const index_of_dead_span = index_table_into_dead_spans_list[category_of_object];
-	if (index_of_dead_span == self.count_of_categorys) return null;
+	if (index_of_dead_span == self.count_of_categorys) {
+    if ((!self.is_native()) or retry) return null;
+    _=self.rebuild();
+    return self.alloc_maybe_retry(not_align_size, true);
+  }
 
 	const dead_spans_list = self.get_dead_spans_list_array();
 	const dead_span = &dead_spans_list[index_of_dead_span];

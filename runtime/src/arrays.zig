@@ -1,5 +1,7 @@
+const Utils = @import("utils.zig");
 
-pub fn dynamic_array(comptime T: type) type {
+
+pub fn runtime_static_array(comptime T: type) type {
 	return struct {
 		ptr: []T,
 		cur: usize,
@@ -20,17 +22,16 @@ pub fn dynamic_array(comptime T: type) type {
 		pub fn init(size: usize) ?Self {
 			return Self{
 				.cur = 0,
-				.ptr = @import("allocator.zig").calloc(size, T) orelse return null
+				.ptr = Utils.calloc(size, T) orelse return null
 			};
 		}
 	};
 }
 
-
 test "push pop" {
 	const equ = @import("test.zig").equ;
 
-	var stack = dynamic_array(usize).init(3).?;
+	var stack = runtime_static_array(usize).init(3).?;
 	stack.push(4);
 	stack.push(3);
 	stack.push(5);

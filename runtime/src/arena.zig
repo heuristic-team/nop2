@@ -3,6 +3,7 @@ const Utils = @import("utils.zig");
 const Allocator = @import("allocator.zig");
 const DeadSpan = @import("dead_span.zig");
 const Object = @import("object.zig");
+const BitsetIterator = @import("bitset_iterator.zig");
 
 const Category = u4;
 const Offset = u16;
@@ -30,15 +31,18 @@ memory_used: usize = 0,
 count_of_categorys: Category = 15,
 
 
+pub const MAX_SUPPORT_PAGE_SIZE: usize = 1 << 16;
 const U8_1: u8 = 1;
 
 
 pub fn toString(self: *Self) ![]const u8 {
 	const std = @import("std");
-	const alloca = std.testing.allocator;
+	// const alloca = std.testing.allocator;
+  var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+  const alloca = arena.allocator();
 	var s = std.array_list.Managed(u8).init(alloca);
 	defer s.deinit();
-	try s.appendSlice("lives: ");
+	try s.appendSlice("lives:\n");
 	if (self.is_native()) {
 		// try s.appendSlice(alloca, "frees: ");
 		const f = Utils.usize2array_of(u8, self.start - self.neg_offset_to_lives, self.size_by_64());
@@ -50,6 +54,7 @@ pub fn toString(self: *Self) ![]const u8 {
 					try s.append('1');
 				}
 			}
+      try s.append('|');
 		}
 		try s.append('\n');
 	}
@@ -83,7 +88,7 @@ pub fn toString(self: *Self) ![]const u8 {
 	const ds = self.get_dead_spans_list_array();
 	for (0..ds.len) |i| {
 		var buf: [64]u8 = undefined;
-		try s.appendSlice(try std.fmt.bufPrint(buf[0..], "|{d}({d})", .{ds[i].offset, ds[i].get_size(self.start)}));
+		try s.appendSlice(try std.fmt.bufPrint(buf[0..], "|{d}:{d}({d})", .{i, ds[i].offset, ds[i].get_size(self.start)}));
 	}
 
 	try s.append('\n');
@@ -104,16 +109,18 @@ fn size_by_8(self: *Self) Offset {
 }
 
 fn roundUpTo8(x: anytype) @TypeOf(x) {
-	return (x + 7) & ~@as(@TypeOf(x), 7);
+	return Utils.roundUpToN(x, 8);
 }
 
 fn roundUpTo64(x: anytype) @TypeOf(x) {
-  return (x + 63) & ~@as(@TypeOf(x), 63);
+  return Utils.roundUpToN(x, 64);
 }
+
 
 pub fn init(self: *Self, size: usize, large: bool, native: bool)
 Allocator.AllocatorError!void {
-	const bytes = Utils.calloc(size, u8)
+	if ((!large) and size > MAX_SUPPORT_PAGE_SIZE) return Allocator.AllocatorError.ArenaSizeIsLarge;
+  const bytes = Utils.calloc(size, u8)
 		orelse Allocator.AllocatorError.OOM;
 
 	defer @import("std").debug.print("start = {x}\n", .{self.start});
@@ -121,12 +128,18 @@ Allocator.AllocatorError!void {
 	self.size = size;
 	self.start = @intFromPtr((try bytes).ptr);
 	if (large) return;
-	self.count_of_categorys = self.category_of_object_by_size(self.size);
+	self.count_of_categorys = self.category_of_object_by_size(self.size) - 1;
+
 	defer _=self.rebuild();
 
-	self.neg_offset_to_dead_spans_list = roundUpTo8(self.size_by_8());
-	self.neg_offset_to_index_table_into_dead_spans_list = roundUpTo8(self.neg_offset_to_dead_spans_list + self.count_of_categorys * @sizeOf(u16));
-	const next_offset = roundUpTo8(self.neg_offset_to_index_table_into_dead_spans_list + self.size_by_64());
+
+	self.neg_offset_to_dead_spans_list = roundUpTo64(self.size_by_8());
+  // @import("std").debug.print("{}\n", .{self});
+  const count_of_categorys_u16: u16 = @intCast(self.count_of_categorys);
+	self.neg_offset_to_index_table_into_dead_spans_list = roundUpTo64(
+    self.neg_offset_to_dead_spans_list + count_of_categorys_u16 * @sizeOf(u16)
+  );
+	const next_offset = roundUpTo64(self.neg_offset_to_index_table_into_dead_spans_list + self.size_by_64());
 	if (native) {
 		self.neg_offset_to_lives = next_offset;
 		self.start += next_offset;
@@ -134,7 +147,7 @@ Allocator.AllocatorError!void {
 		return;
 	}
 	self.neg_offset_to_gray_bitset = next_offset;
-	self.neg_offset_to_black_bitset = roundUpTo8(self.neg_offset_to_gray_bitset + self.size_by_64());
+	self.neg_offset_to_black_bitset = roundUpTo64(self.neg_offset_to_gray_bitset + self.size_by_64());
 	self.start += self.neg_offset_to_black_bitset;
 	self.size  -= self.neg_offset_to_black_bitset;
 }
@@ -158,7 +171,7 @@ fn bounds_of_span_by_category(category: Category) struct { u16, u16 } {
 
 fn category_of_object_by_size(self: *Self, size: usize) Category {
 	const num_of_category = Utils.max(usize, num_of_highest_set(size), 3) - 3; // num_of_highest_set([8-15]) = 3
-	@import("std").debug.print("size: {d}\nnum of cat: {d}\nmax cat:{d}\n", .{size, num_of_category, self.count_of_categorys});
+	// @import("std").debug.print("size: {d}\nnum of cat: {d}\nmax cat:{d}\n", .{size, num_of_category, self.count_of_categorys});
 	if (num_of_category >= self.count_of_categorys) unreachable;
 	return @intCast(num_of_category);
 }
@@ -198,8 +211,18 @@ fn get_dead_spans_list_array(self: *Self) []DeadSpan {
 	);
 }
 
+pub fn new(self: *Self, comptime T: type) !*T {
+  const raw = try self.alloc(@sizeOf(T));
+  const ptr: *T = @ptrCast(raw);
+  return ptr;
+}
+
 pub fn alloc(self: *Self, not_align_size: usize) ?usize {
-  @import("std").debug.print("allllllllllllllllllllllllllloca\n", .{});
+  return self.alloc_maybe_retry(not_align_size, false);
+
+}
+pub fn alloc_maybe_retry(self: *Self, not_align_size: usize, retry: bool) ?usize {
+  @import("std").debug.print("allllllllllllllllllllllllllloca {d}\n", .{not_align_size});
 	const size: u16 = @intCast(roundUpTo8(not_align_size));
 	@import("std").debug.print("size: {d}\n", .{size});
 	if (size > self.size) return null;
@@ -212,49 +235,55 @@ pub fn alloc(self: *Self, not_align_size: usize) ?usize {
 	);
 
 	const category_of_object = self.category_of_object_by_size(size);
-	@import("std").debug.print("cat: {d}\n", .{category_of_object});
+	// @import("std").debug.print("cat: {d}\n", .{category_of_object});
 	const index_of_dead_span = index_table_into_dead_spans_list[category_of_object];
-	if (index_of_dead_span == self.count_of_categorys) return null;
+	if (index_of_dead_span == self.count_of_categorys) {
+    if ((!self.is_native()) or retry) return null;
+    _=self.rebuild();
+    return self.alloc_maybe_retry(not_align_size, true);
+  }
 
 	const dead_spans_list = self.get_dead_spans_list_array();
 	const dead_span = &dead_spans_list[index_of_dead_span];
 	const size_of_span: u16 = dead_span.get_size(self.start);
-	@import("std").debug.print("size_of_span: {d}\nstart_of_span: {d}\n", .{size_of_span, dead_span.offset});
+	// @import("std").debug.print("size_of_span: {d}\nstart_of_span: {d}\n", .{size_of_span, dead_span.offset});
 	const category_of_span = self.category_of_span_by_size(size_of_span);
 	const new_size_of_span = size_of_span - size;
-	const new_category_of_span = self.category_of_span_by_size(new_size_of_span);
-	if (new_category_of_span < category_of_span)
-		index_table_into_dead_spans_list[category_of_span] += 1;
-
-	defer dead_span.set_size(self.start, new_size_of_span);
-	defer dead_span.shift(@intCast(size));
-
   const ptr = dead_span.start(self.start);
-  self.set_bit(self.neg_offset_to_lives, ptr, 1);
+  if (new_size_of_span > 7) {
+    const new_category_of_span = self.category_of_span_by_size(new_size_of_span);
+    if (new_category_of_span < category_of_span)
+      index_table_into_dead_spans_list[category_of_span] += 1;
+
+    dead_span.shift(@intCast(size));
+    dead_span.set_size(self.start, new_size_of_span);
+  } else {
+    index_table_into_dead_spans_list[category_of_span] += 1;
+  }
+
+  if (self.is_native())
+    self.set_bit(self.neg_offset_to_lives, ptr, 1);
 	return ptr;
 }
 
 fn set_bit(self: *Self, neg_offset: Offset, ptr: usize, bit: u1) void {
 	const offset: u16 = @intCast(ptr - self.start);
+  // @import("std").debug.print("offset = {d}\n", .{offset});
   const num_of_bit = offset / 8;
 	var bitset = Utils.usize2array_of(u8, self.start - neg_offset, self.size_by_64());
 	const i = num_of_bit / 8;
 	const j: u3 = @intCast(num_of_bit % 8);
-  bitset[i] |= (@as(u8, bit) << j);
+  if (bit == 1) {
+    bitset[i] |= (U8_1 << j);
+  } else {
+    bitset[i] &= ~(U8_1 << j);
+  }
 }
 
 pub fn free(self: *Self, ptr: usize) Allocator.AllocatorError!void {
 	if (!self.is_native()) return Allocator.AllocatorError.FreeOnManagedArena;
 
 	self.set_bit(self.neg_offset_to_lives, ptr, 0);
-}
-
-fn offset_by_byte_and_bit(byte: usize, bit: usize) u16 {
-	return @intCast(8 * (8 * byte + bit));
-}
-
-fn ptr_by_byte_and_bit(self: *Self, byte: usize, bit: usize) usize {
-	return self.start + offset_by_byte_and_bit(byte, bit);
 }
 
 fn register_span(self: *Self,
@@ -265,17 +294,18 @@ fn register_span(self: *Self,
 	i: *u16,
 	is_last_category: *bool
 ) void {
-	@import("std").debug.print(
-     \\try to register span on:
-     \\start of span = {x}
-     \\size of span  = {d}
-     \\category =      {d}
-     \\index =         {d}
-     \\
- , .{start_of_span, size_of_span, category, i.*});
+	// @import("std").debug.print(
+ //     \\try to register span on:
+ //     \\start of arena= {x}
+ //     \\start of span = {x}
+ //     \\size of span  = {d}
+ //     \\category =      {d}
+ //     \\index =         {d}
+ //     \\
+ // , .{self.start, start_of_span, size_of_span, category, i.*});
 	const actual_category = self.category_of_span_by_size(size_of_span);
 	if (category == actual_category) {
-		@import("std").debug.print("register!!!!!!!!!!!!!!!\n", .{});
+		// @import("std").debug.print("register!!!!!!!!!!!!!!!\n", .{});
 		dead_spans_list[i.*] = DeadSpan.from_ptrs(self.start, start_of_span);
     dead_spans_list[i.*].set_size(self.start, size_of_span);
 		i.* += 1;
@@ -288,8 +318,9 @@ fn start_of_span_by_last_object(self: *Self, last_object: usize) usize {
 	var start_of_span = self.start;
 	if (last_object != 0) {
 		const addr_of_last_object: **Object = @ptrFromInt(last_object);
-		start_of_span = addr_of_last_object.*.size + last_object;
+		start_of_span = roundUpTo8(addr_of_last_object.*.size) + last_object;
 	}
+  // @import("std").debug.print("start of span {x}\n", .{start_of_span});
 	return start_of_span;
 }
 
@@ -307,36 +338,64 @@ fn rebuild(self: *Self) bool {
 	const bitset = Utils.usize2array_of(u8, self.start - offset, self.size / 64);
   // @import("std").debug.print("{s}", .{self.toString() catch unreachable});
 	for (0..self.count_of_categorys) |category| {
+    // @import("std").debug.print("start of loop with category={d}: \n{s}", .{category, self.toString() catch unreachable});
 		var is_last_category = true;
 
 		table[category] = i;
-		var in_span = true;
+    var is_first_check = true;
 		var last_object: usize = 0;
-		for (bitset, 0..) |byte_of_bitset, num_of_byte| {
-			if (byte_of_bitset == 0) {
-				continue;
-			}
+    var iter = BitsetIterator.from_offset(0);
+    byte_cyrcle: while (iter.num_of_byte < bitset.len) {
+      // @import("std").debug.print("iter: {d}\n", .{iter.get_offset()});
+      // @import("std").debug.print("start of loop with num_of_byte={d}: \n{s}", .{iter.num_of_byte, self.toString() catch unreachable});
+      const byte_of_bitset = bitset[iter.num_of_byte];
+			// if (byte_of_bitset == 0) {
+        // is_first_check = false;
+        // iter.num_of_byte += 1;
+				// continue;
+			// }
 
-			for (0..8) |num_of_bit| {
-				if ((byte_of_bitset & (U8_1 << @intCast(num_of_bit))) != 0) {
-					if (in_span) {
-						const start_of_span = self.start_of_span_by_last_object(last_object);
-						const end_of_span = self.ptr_by_byte_and_bit(num_of_byte, num_of_bit);
-						const size_of_span: u16 = @intCast(end_of_span - start_of_span);
-						self.register_span(category,
-							size_of_span,
-							start_of_span,
-							dead_spans_list,
-							&i,
-							&is_last_category
-						);
-						in_span = false;
-					}
-					last_object = self.ptr_by_byte_and_bit(num_of_byte, num_of_bit);
+      while (iter.num_of_bit < 8) {
+        // @import("std").debug.print("inner: {d}\n", .{iter.get_offset()});
+				if ((byte_of_bitset & (U8_1 << @intCast(iter.num_of_bit))) != 0) {
+          // @import("std").debug.print("find bit on offset {d}\n", .{iter.get_offset()});
+          const end_of_span = iter.ptr_by_base(self.start);
+          if (!is_first_check) {
+            const start_of_span = self.start_of_span_by_last_object(last_object);
+            // @import("std").debug.print(
+            //     \\start {x}
+            //     \\end   {x}
+            //     \\last obj {x}
+            //     \\
+            // , .{start_of_span, end_of_span, last_object});
+            const size_of_span: u16 = @intCast(end_of_span - start_of_span);
+            self.register_span(category,
+              size_of_span,
+              start_of_span,
+              dead_spans_list,
+              &i,
+              &is_last_category
+            );
+          }
+          is_first_check = true;
+					last_object = end_of_span;
+
+          // @import("std").debug.print("set iter {d}\n", .{self.start_of_span_by_last_object(end_of_span) - self.start});
+          iter.set_by_offset(@intCast(self.start_of_span_by_last_object(end_of_span) - self.start));
+
+          // @import("std").debug.print("set offset to {d}\n", .{iter.get_offset()});
+
+          continue :byte_cyrcle;
 				}
+        is_first_check = false;
+
+        iter.num_of_bit += 1;
 			}
+      iter.num_of_bit = 0;
+
+      iter.num_of_byte += 1;
 		}
-		if (in_span) {
+		if (!is_first_check) {
 			const start_of_span = self.start_of_span_by_last_object(last_object);
 			const size_of_span: u16 = @intCast(self.start + self.size - self.start_of_span_by_last_object(last_object));
 			self.register_span(category,
@@ -351,35 +410,127 @@ fn rebuild(self: *Self) bool {
 			for (category + 1..self.count_of_categorys) |empty_category| {
 				table[empty_category] = @intCast(self.len_of_dead_spans_list());
 			}
-		  if (in_span and (last_object == 0)) return true;
+		  if (last_object == 0) return true;
 		}
-    @import("std").debug.print("end of rebuild: \n{s}", .{self.toString() catch unreachable});
+    // @import("std").debug.print("end of rebuild: \n{s}", .{self.toString() catch unreachable});
 	}
 	return false;
 }
 
+const type64 = Object{
+  .size = 64,
+  .bitset = &[_]u8{0} ** 8,
+};
+
+const type100 = Object{
+  .size = 100,
+  .bitset = &[_]u8{0} ** 13,
+};
+
+const type8 = Object{
+  .size = 8,
+  .bitset = &[_]u8{0},
+};
+
+
+const eq = @import("test.zig").equ;
+
+
+fn test_alloc(self: *Self, o: *const Object) !usize {
+  const ptr = self.alloc(o.size);
+  @import("std").debug.print("{s}", .{try self.toString()});
+  try eq(ptr == null, false);
+  const addr: **const Object = @ptrFromInt(ptr.?);
+  addr.* = o;
+  return ptr.?;
+}
 
 test "test1" {
 	var a = Self{};
-	try a.init(512, false, true);
+	try a.init(1024, false, true);
 	// @import("std").debug.print("{s}", .{try a.toString()});
-
-	const eq = @import("test.zig").equ;
 
 	try eq(a.is_native(), true);
 	try eq(a.is_large(), false);
-	@import("std").debug.print("{s}", .{try a.toString()});
-	const ptr1 = a.alloc(64);
-  try eq(ptr1 == null, false);
-  @import("std").debug.print("{s}", .{try a.toString()});
-  const ptr2 = a.alloc(16);
-  try eq(ptr2 == null, false);
-  @import("std").debug.print("[{x}] {s}", .{ptr2.?, try a.toString()});
-  const ptr3 = a.alloc(20);
-  try eq(ptr3 == null, false);
-  @import("std").debug.print("{s}", .{try a.toString()});
-  try a.free(ptr2.?);
-  @import("std").debug.print("{s}", .{try a.toString()});
+
+  _= try a.test_alloc(&type8);
+  const ptr2 = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  const ptr3 = try a.test_alloc(&type100);
+  _= try a.test_alloc(&type8);
+  const ptr4 = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  const ptr5 = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  const ptr6 = try a.test_alloc(&type100);
+  _ = try a.test_alloc(&type100);
+  _ = try a.test_alloc(&type100);
+  _= try a.test_alloc(&type8);
+  const ptr7 = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  @import("std").debug.print("before free: \n{s}", .{try a.toString()});
+  try a.free(ptr2);
+  try a.free(ptr3);
+  try a.free(ptr4);
+  try a.free(ptr5);
+  try a.free(ptr6);
+  try a.free(ptr7);
+  @import("std").debug.print("after free: \n{s}", .{try a.toString()});
   _=a.rebuild();
-  @import("std").debug.print("{s}", .{try a.toString()});
+  @import("std").debug.print("after rebuild:\n{s}", .{try a.toString()});
+  // @import("std").debug.print("before free: \n{s}", .{try a.toString()});
+  // _= try a.test_alloc(&type8);
+  // @import("std").debug.print("after alloca \n", .{});
+  // _= try a.test_alloc(&type8);
+  // @import("std").debug.print("after alloca \n", .{});
+  // _= try a.test_alloc(&type8);
+  // @import("std").debug.print("after alloca \n", .{});
+  for (0..50) |_| {
+    _= try a.test_alloc(&type8);
+    // var ptr = try a.test_alloc(&type100);
+    // _= try a.test_alloc(&type8);
+    // try a.free(ptr);
+    // _= try a.test_alloc(&type8);
+    // ptr = try a.test_alloc(&type64);
+    // _= try a.test_alloc(&type8);
+    // try a.free(ptr);
+  }
+  _=a.rebuild();
+  @import("std").debug.print("after rebuild:\n{s}", .{try a.toString()});
+
+}
+
+test "test2" {
+  @import("std").debug.print("TEST2", .{});
+  var a = Self{};
+  try a.init(1024, false, true);
+
+  _= try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  var ptr = try a.test_alloc(&type100);
+  _= try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  ptr = try a.test_alloc(&type100);
+  _= try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  ptr = try a.test_alloc(&type100);
+  _= try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  ptr = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  ptr = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  ptr = try a.test_alloc(&type8);
+  _= try a.test_alloc(&type8);
+  try a.free(ptr);
+  _= try a.test_alloc(&type8);
+
+  _=a.rebuild();
+  @import("std").debug.print("after rebuild:\n{s}", .{try a.toString()});
+  _= try a.test_alloc(&type64);
 }

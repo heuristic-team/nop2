@@ -1,5 +1,5 @@
+const Utils = @import("utils.zig");
 
-const calloc = @import("utils.zig").calloc;
 
 pub fn runtime_static_array(comptime T: type) type {
 	return struct {
@@ -22,7 +22,7 @@ pub fn runtime_static_array(comptime T: type) type {
 		pub fn init(size: usize) ?Self {
 			return Self{
 				.cur = 0,
-				.ptr = calloc(size, T) orelse return null
+				.ptr = Utils.calloc(size, T) orelse return null
 			};
 		}
 	};
